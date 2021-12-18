@@ -1,4 +1,4 @@
-use anyhow::Result;
+use thiserror::Error;
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -14,9 +14,16 @@ where
 }
 
 /// Column can either be a i32 or a String.
+#[derive(Eq, PartialEq, Hash)]
 pub enum Column {
     Number(i32),
     Str(String),
+}
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("invalid rdo_lookahead_frames {0} (expected < {})", i32::MAX)]
+    InvalidLookahead(u32),
 }
 
 /// Rover is an inmemory indexer, which can be used to index any KV database. A `value_decoder` is
@@ -28,9 +35,9 @@ where
     V: AsRef<[u8]>,
 {
     // O(1) access (hard requirement)
-    maps: HashMap<ColumnIndex, HashMap<K, V>>,
+    maps: HashMap<ColumnIndex, HashMap<Column, Vec<K>>>,
     // iterating over sorted keys
-    btrees: HashMap<ColumnIndex, BTreeMap<K, V>>,
+    btrees: HashMap<ColumnIndex, BTreeMap<Column, Vec<K>>>,
     // a decoder which knows how to transform raw bytes into a vector of Column
     value_decoder: Box<dyn ValueDecoder<V> + 'static>,
 }
@@ -48,16 +55,36 @@ where
         }
     }
 
-    pub fn index_all_columns(&self, k: K, v: V) -> Result<()> {
+    pub fn index_all_columns(&self, k: K, v: V) -> Result<(), Error> {
         let columns = self.value_decoder.decode(v);
-        for c in &columns {
-            self.index_column(k.as_ref(), c)?;
+        for (i, c) in columns.iter().enumerate() {
+            self.index_column(k.as_ref(), c, i as u8)?; // XXX: possible overflow error
         }
         Ok(())
     }
 
-    fn index_column(&self, k: &[u8], c: &Column) -> Result<()> {
+    fn index_column(&self, k: &[u8], c: &Column, index: ColumnIndex) -> Result<(), Error> {
+        match self.maps.get_mut(&index) {
+            Some(m) => match m.get_mut(c) {
+                Some(keys) => keys.push(k),
+                None => m.insert(c.clone(), vec![k]),
+            },
+            None => {
+                let mut m = HashMap::new();
+                m.insert(c.clone(), vec![k]);
+                self.maps.insert(&index, m);
+            }
+        }
         Ok(())
+    }
+
+    /// Returns a vector of keys or None if no keys are associated with the given Column.
+    pub fn get(c: Column) -> Option<Vec<K>> {
+        panic!("unimplemented")
+    }
+
+    pub fn sort_by(c: Column) -> Vec<K> {
+        panic!("unimplemented")
     }
 }
 
@@ -83,7 +110,8 @@ mod tests {
     fn it_indexes_all_columns() {
         let r: Rover<&[u8], &[u8]> = Rover::new(Box::new(BorshValueDecoder {}));
         for (k, v) in [(1, "a"), (2, "b"), (3, "c")] {
-            r.index_all_columns(&(k as i32).to_be_bytes(), v.as_bytes());
+            r.index_all_columns(&(k as i32).to_be_bytes(), v.as_bytes())
+                .unwrap();
         }
     }
 }
