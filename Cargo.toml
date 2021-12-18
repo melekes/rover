@@ -1,8 +1,15 @@
 [package]
 name = "rover"
 version = "0.1.0"
-edition = "2021"
+authors = ["Anton Kaliaev <anton.kalyaev@gmail.com>"]
+edition = "2018"
+rust-version = "1.31"
+license = "MIT"
+description = "An indexer for any KV database"
+repository = "https://github.com/melekes/rover"
+documentation = "https://docs.rs/rover"
+categories = ["databases"]
+readme = "README.md"
 
 [dependencies]
 borsh = "0.9.1"
-thiserror = "1.0"

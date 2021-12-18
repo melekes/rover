@@ -6,7 +6,7 @@ An indexer for any KV database.
 
 ```toml
 [dependencies]
-rover = "0.0.1"
+rover = "0.1.0"
 ```
 
 ## Example
