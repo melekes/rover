@@ -1,6 +1,6 @@
 # Rover
 
-[<img alt="build status" src="https://img.shields.io/github/workflow/status/melekes/rover/CI/master?style=for-the-badge" height="20">](https://github.com/melekes/rover/actions?query=branch%3Amaster)
+[![CI](https://github.com/melekes/rover/actions/workflows/ci.yml/badge.svg)](https://github.com/melekes/rover/actions/workflows/ci.yml)
 
 An indexer for any KV database.
 
