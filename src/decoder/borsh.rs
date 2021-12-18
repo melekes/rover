@@ -6,7 +6,7 @@ impl<V> ValueDecoder<V> for BorshValueDecoder
 where
     V: AsRef<[u8]>,
 {
-    fn decode(&self, value: V) -> Vec<Column> {
-        Vec::new()
+    fn decode(&self, v: V) -> Vec<Column> {
+        panic!("unimplemented")
     }
 }

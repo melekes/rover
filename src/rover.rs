@@ -44,7 +44,7 @@ where
 
 impl<K, V> Rover<K, V>
 where
-    K: AsRef<[u8]>,
+    K: AsRef<[u8]> + Copy,
     V: AsRef<[u8]>,
 {
     pub fn new(value_decoder: Box<dyn ValueDecoder<V>>) -> Self {
@@ -55,32 +55,43 @@ where
         }
     }
 
-    pub fn index_all_columns(&self, k: K, v: V) -> Result<(), Error> {
+    pub fn index_all_columns(&mut self, k: K, v: V) -> Result<(), Error> {
         let columns = self.value_decoder.decode(v);
-        for (i, c) in columns.iter().enumerate() {
-            self.index_column(k.as_ref(), c, i as u8)?; // XXX: possible overflow error
+        let mut i: u8 = 0;
+        for c in columns {
+            self.index_column(k, c, i)?;
+            i += 1; // XXX: possible overflow
         }
         Ok(())
     }
 
-    fn index_column(&self, k: &[u8], c: &Column, index: ColumnIndex) -> Result<(), Error> {
+    fn index_column(&mut self, k: K, c: Column, index: ColumnIndex) -> Result<(), Error> {
+        // hashmap
         match self.maps.get_mut(&index) {
-            Some(m) => match m.get_mut(c) {
+            Some(m) => match m.get_mut(&c) {
                 Some(keys) => keys.push(k),
-                None => m.insert(c.clone(), vec![k]),
+                None => {
+                    m.insert(c, vec![k]);
+                    ()
+                }
             },
+
             None => {
                 let mut m = HashMap::new();
-                m.insert(c.clone(), vec![k]);
-                self.maps.insert(&index, m);
+                m.insert(c, vec![k]);
+                self.maps.insert(index, m);
             }
         }
+
+        // btreemap
+        // TODO
+
         Ok(())
     }
 
     /// Returns a vector of keys or None if no keys are associated with the given Column.
-    pub fn get(c: Column) -> Option<Vec<K>> {
-        panic!("unimplemented")
+    pub fn get(&self, c: Column, index: ColumnIndex) -> Option<&Vec<K>> {
+        self.maps.get(&index).map_or(None, |m| m.get(&c))
     }
 
     pub fn sort_by(c: Column) -> Vec<K> {
@@ -91,7 +102,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decoder::borsh::BorshValueDecoder;
 
     struct SingleStringValueDecoder {}
     impl<V> ValueDecoder<V> for SingleStringValueDecoder
@@ -108,10 +118,14 @@ mod tests {
 
     #[test]
     fn it_indexes_all_columns() {
-        let r: Rover<&[u8], &[u8]> = Rover::new(Box::new(BorshValueDecoder {}));
-        for (k, v) in [(1, "a"), (2, "b"), (3, "c")] {
-            r.index_all_columns(&(k as i32).to_be_bytes(), v.as_bytes())
-                .unwrap();
+        let mut r: Rover<&[u8], &[u8]> = Rover::new(Box::new(SingleStringValueDecoder {}));
+        for (k, v) in [("1", "a"), ("2", "b"), ("3", "c")] {
+            r.index_all_columns(k.as_bytes(), v.as_bytes()).unwrap();
         }
+
+        assert_eq!(
+            Some(vec!["1".as_bytes()].as_ref()),
+            r.get(Column::Str("a".to_string()), 0)
+        );
     }
 }
