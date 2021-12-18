@@ -28,3 +28,15 @@ assert_eq!(
 - [ ] borsh decoder
 - [ ] quickcheck tests
 - [ ] fuzz tests
+
+## Details
+
+- Rover is generic over keys and values as long as they can be cheaply
+  converted into `&[u8]`.
+- When constructing a rover, a decoder argument must be provided, which job is
+  to parse values into vectors of `Column`.
+- `Column` can either be a number or a string. Is there a way to avoid
+  introducing a `Column` struct?
+- Rover constructs a `HashMap` and `BTreeMap` for each column. `HashMap` can be
+  removed if/when `O(1)` requirement is dropped. Then the time to get keys
+  becomes logarithmic (still pretty fast & saves a lot of memory).

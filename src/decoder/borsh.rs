@@ -1,8 +1,8 @@
-use crate::rover::{Column, ValueDecoder};
+use crate::rover::{Column, ValueDecoder as RoverValueDecoder};
 
-pub struct BorshValueDecoder {}
+pub struct ValueDecoder {}
 
-impl<V> ValueDecoder<V> for BorshValueDecoder
+impl<V> RoverValueDecoder<V> for ValueDecoder
 where
     V: AsRef<[u8]>,
 {

@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, HashMap};
 
-/// Column's index (0...255)
-pub type ColumnIndex = u8;
+/// Column's index.
+pub type ColumnIndex = usize;
 
-/// ValueDecoder transforms a value into a vector of Columns.
+/// Transforms a value into a vector of Columns.
 pub trait ValueDecoder<V>
 where
     V: AsRef<[u8]>,
@@ -19,8 +19,8 @@ pub enum Column {
 }
 
 /// Rover is an inmemory indexer, which can be used to index any KV database. A `value_decoder` is
-/// used to transform a value into a vector of Columns. Then, for each column, a HashMap and
-/// BTreeMap are built. A hashmap gives O(1) access, a btree map gives us sorted list.
+/// used to transform a value into a vector of Columns. Then, for each column, a `HashMap` and
+/// `BTreeMap` are built. A hashmap gives O(1) access, a btree map gives us sorted list.
 pub struct Rover<K, V>
 where
     K: AsRef<[u8]>,
@@ -39,6 +39,7 @@ where
     K: AsRef<[u8]> + Copy,
     V: AsRef<[u8]>,
 {
+    #[must_use]
     pub fn new(value_decoder: Box<dyn ValueDecoder<V>>) -> Self {
         Self {
             maps: HashMap::new(),
@@ -50,53 +51,51 @@ where
     pub fn index_all_columns(&mut self, k: K, v: V) {
         let columns = self.value_decoder.decode(v);
         for (i, c) in columns.into_iter().enumerate() {
-            // XXX: possible overflow
-            self.index_column(k, c, i as u8);
+            self.index_column(k, c, i);
         }
     }
 
     fn index_column(&mut self, k: K, c: Column, index: ColumnIndex) {
         let c_copy = c.clone();
+
         // hashmap
-        match self.maps.get_mut(&index) {
-            Some(m) => match m.get_mut(&c) {
+        if let Some(m) = self.maps.get_mut(&index) {
+            match m.get_mut(&c) {
                 Some(keys) => keys.push(k),
                 None => {
                     m.insert(c, vec![k]);
                 }
-            },
-
-            None => {
-                let mut m = HashMap::new();
-                m.insert(c, vec![k]);
-                self.maps.insert(index, m);
             }
+        } else {
+            let mut m = HashMap::new();
+            m.insert(c, vec![k]);
+            self.maps.insert(index, m);
         }
 
         // btreemap
-        match self.btrees.get_mut(&index) {
-            Some(m) => match m.get_mut(&c_copy) {
+        if let Some(m) = self.btrees.get_mut(&index) {
+            match m.get_mut(&c_copy) {
                 Some(keys) => keys.push(k),
                 None => {
                     m.insert(c_copy, vec![k]);
                 }
-            },
-
-            None => {
-                let mut m = BTreeMap::new();
-                m.insert(c_copy, vec![k]);
-                self.btrees.insert(index, m);
             }
+        } else {
+            let mut m = BTreeMap::new();
+            m.insert(c_copy, vec![k]);
+            self.btrees.insert(index, m);
         }
     }
 
     /// Returns a vector of keys or None if no keys are associated with the given Column.
-    pub fn get(&self, c: Column, index: ColumnIndex) -> Option<&Vec<K>> {
-        self.maps.get(&index).and_then(|m| m.get(&c))
+    #[must_use]
+    pub fn get(&self, c: &Column, index: ColumnIndex) -> Option<&Vec<K>> {
+        self.maps.get(&index).and_then(|m| m.get(c))
     }
 
     /// Returns a vector of keys sorted by the given column. Note keys with the same column are in
     /// order which they were indexed.
+    #[must_use]
     pub fn sort_by_column(&self, index: ColumnIndex) -> Vec<K> {
         self.btrees.get(&index).map_or(Vec::new(), |m| {
             m.values().fold(Vec::new(), |mut acc, x| {
@@ -132,7 +131,7 @@ mod tests {
             r.index_all_columns(k, v);
         }
 
-        assert_eq!(Some(&vec!["1"]), r.get(Column::Str("a".to_string()), 0));
+        assert_eq!(Some(&vec!["1"]), r.get(&Column::Str("a".to_string()), 0));
     }
 
     #[test]
