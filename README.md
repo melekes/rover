@@ -1,5 +1,7 @@
 # Rover
 
+[<img alt="build status" src="https://img.shields.io/github/workflow/status/melekes/rover/CI/master?style=for-the-badge" height="20">](https://github.com/melekes/rover/actions?query=branch%3Amaster)
+
 An indexer for any KV database.
 
 ```toml
@@ -20,5 +22,3 @@ assert_eq!(
     r.get(Column::Str("a".to_string()), 0)
 );
 ```
-
-

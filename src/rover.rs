@@ -111,6 +111,7 @@ where
 mod tests {
     use super::*;
 
+    /// Column is a single String.
     struct SingleStringValueDecoder {}
     impl<V> ValueDecoder<V> for SingleStringValueDecoder
     where
@@ -126,26 +127,20 @@ mod tests {
 
     #[test]
     fn it_indexes_all_columns() {
-        let mut r: Rover<&[u8], &[u8]> = Rover::new(Box::new(SingleStringValueDecoder {}));
+        let mut r: Rover<&str, &str> = Rover::new(Box::new(SingleStringValueDecoder {}));
         for (k, v) in [("1", "a"), ("2", "b"), ("3", "c")] {
-            r.index_all_columns(k.as_bytes(), v.as_bytes());
+            r.index_all_columns(k, v);
         }
 
-        assert_eq!(
-            Some(vec!["1".as_bytes()].as_ref()),
-            r.get(Column::Str("a".to_string()), 0)
-        );
+        assert_eq!(Some(&vec!["1"]), r.get(Column::Str("a".to_string()), 0));
     }
 
     #[test]
     fn sort_by_column_returns_correct_order() {
-        let mut r: Rover<&[u8], &[u8]> = Rover::new(Box::new(SingleStringValueDecoder {}));
+        let mut r: Rover<&str, &str> = Rover::new(Box::new(SingleStringValueDecoder {}));
         for (k, v) in [("1", "b"), ("2", "a"), ("3", "c")] {
-            r.index_all_columns(k.as_bytes(), v.as_bytes());
+            r.index_all_columns(k, v);
         }
-        assert_eq!(
-            vec!["2".as_bytes(), "1".as_bytes(), "3".as_bytes()].as_ref(),
-            r.sort_by_column(0)
-        );
+        assert_eq!(vec!["2", "1", "3"], r.sort_by_column(0));
     }
 }
