@@ -13,3 +13,7 @@ readme = "README.md"
 
 [dependencies]
 borsh = "0.9.1"
+
+[lib]
+name = "rover"
+path = "src/lib.rs"

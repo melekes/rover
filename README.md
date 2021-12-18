@@ -22,3 +22,9 @@ assert_eq!(
     r.get(Column::Str("a".to_string()), 0)
 );
 ```
+
+## TODO
+
+- [ ] borsh decoder
+- [ ] quickcheck tests
+- [ ] fuzz tests

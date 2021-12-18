@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [beta, stable, 1.38.0]
+        rust: [beta, stable]
         include:
           - rust: nightly
             rustflags: --cfg rover_nightly_testing
@@ -25,14 +25,6 @@ jobs:
       - run: cargo test --all
         env:
           RUSTFLAGS: ${{matrix.rustflags}}
-
-  msrv:
-    name: Rust 1.31.0
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: dtolnay/rust-toolchain@1.31.0
-      - run: cargo check
 
   clippy:
     name: Clippy
