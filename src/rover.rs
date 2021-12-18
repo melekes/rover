@@ -1,5 +1,3 @@
-use thiserror::Error;
-
 use std::collections::{BTreeMap, HashMap};
 
 /// Column's index (0...255)
@@ -14,16 +12,10 @@ where
 }
 
 /// Column can either be a i32 or a String.
-#[derive(Eq, PartialEq, Hash)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Hash, Clone)]
 pub enum Column {
     Number(i32),
     Str(String),
-}
-
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("invalid rdo_lookahead_frames {0} (expected < {})", i32::MAX)]
-    InvalidLookahead(u32),
 }
 
 /// Rover is an inmemory indexer, which can be used to index any KV database. A `value_decoder` is
@@ -55,24 +47,22 @@ where
         }
     }
 
-    pub fn index_all_columns(&mut self, k: K, v: V) -> Result<(), Error> {
+    pub fn index_all_columns(&mut self, k: K, v: V) {
         let columns = self.value_decoder.decode(v);
-        let mut i: u8 = 0;
-        for c in columns {
-            self.index_column(k, c, i)?;
-            i += 1; // XXX: possible overflow
+        for (i, c) in columns.into_iter().enumerate() {
+            // XXX: possible overflow
+            self.index_column(k, c, i as u8);
         }
-        Ok(())
     }
 
-    fn index_column(&mut self, k: K, c: Column, index: ColumnIndex) -> Result<(), Error> {
+    fn index_column(&mut self, k: K, c: Column, index: ColumnIndex) {
+        let c_copy = c.clone();
         // hashmap
         match self.maps.get_mut(&index) {
             Some(m) => match m.get_mut(&c) {
                 Some(keys) => keys.push(k),
                 None => {
                     m.insert(c, vec![k]);
-                    ()
                 }
             },
 
@@ -84,18 +74,36 @@ where
         }
 
         // btreemap
-        // TODO
+        match self.btrees.get_mut(&index) {
+            Some(m) => match m.get_mut(&c_copy) {
+                Some(keys) => keys.push(k),
+                None => {
+                    m.insert(c_copy, vec![k]);
+                }
+            },
 
-        Ok(())
+            None => {
+                let mut m = BTreeMap::new();
+                m.insert(c_copy, vec![k]);
+                self.btrees.insert(index, m);
+            }
+        }
     }
 
     /// Returns a vector of keys or None if no keys are associated with the given Column.
     pub fn get(&self, c: Column, index: ColumnIndex) -> Option<&Vec<K>> {
-        self.maps.get(&index).map_or(None, |m| m.get(&c))
+        self.maps.get(&index).and_then(|m| m.get(&c))
     }
 
-    pub fn sort_by(c: Column) -> Vec<K> {
-        panic!("unimplemented")
+    /// Returns a vector of keys sorted by the given column. Note keys with the same column are in
+    /// order which they were indexed.
+    pub fn sort_by_column(&self, index: ColumnIndex) -> Vec<K> {
+        self.btrees.get(&index).map_or(Vec::new(), |m| {
+            m.values().fold(Vec::new(), |mut acc, x| {
+                acc.append(x.clone().as_mut());
+                acc
+            })
+        })
     }
 }
 
@@ -120,12 +128,24 @@ mod tests {
     fn it_indexes_all_columns() {
         let mut r: Rover<&[u8], &[u8]> = Rover::new(Box::new(SingleStringValueDecoder {}));
         for (k, v) in [("1", "a"), ("2", "b"), ("3", "c")] {
-            r.index_all_columns(k.as_bytes(), v.as_bytes()).unwrap();
+            r.index_all_columns(k.as_bytes(), v.as_bytes());
         }
 
         assert_eq!(
             Some(vec!["1".as_bytes()].as_ref()),
             r.get(Column::Str("a".to_string()), 0)
+        );
+    }
+
+    #[test]
+    fn sort_by_column_returns_correct_order() {
+        let mut r: Rover<&[u8], &[u8]> = Rover::new(Box::new(SingleStringValueDecoder {}));
+        for (k, v) in [("1", "b"), ("2", "a"), ("3", "c")] {
+            r.index_all_columns(k.as_bytes(), v.as_bytes());
+        }
+        assert_eq!(
+            vec!["2".as_bytes(), "1".as_bytes(), "3".as_bytes()].as_ref(),
+            r.sort_by_column(0)
         );
     }
 }
